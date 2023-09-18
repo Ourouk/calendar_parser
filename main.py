@@ -1,4 +1,5 @@
 from flask import Flask, Response, request, jsonify, abort
+from flask_cors import CORS
 import requests
 from ics import Calendar, Event
 import os
@@ -9,7 +10,7 @@ import hashlib
 
 
 app = Flask(__name__)
-
+CORS(app)
 ### Temp Folders ###
 CACHE_DIR_PROCESSED = './temp/processed/'
 CACHE_DIR_RAW = './temp/raw/'
