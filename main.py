@@ -10,7 +10,9 @@ import hashlib
 
 
 app = Flask(__name__)
+### Enable CORS so the webApp can use it###
 CORS(app)
+
 ### Temp Folders ###
 CACHE_DIR_PROCESSED = './temp/processed/'
 CACHE_DIR_RAW = './temp/raw/'
@@ -73,7 +75,7 @@ def available_event_from_calendar(ics_text):
     counter_event = 0
     for event in calendar.events:
         if event.name not in event_dict.values():
-            key = f'event_{counter_event}'
+            key = f'e_{counter_event}'
             event_dict[key] = event.name
             counter_event += 1
     json_buff =  json.dumps(event_dict)
@@ -162,15 +164,16 @@ def merge_calendars(calendars:[Calendar]):
 ### Performance Improvement ###
 def caching(folder,content_function,content_function_params,hash_seed,file_format,cache_time_indays=1):
     cache_filename = os.path.join(folder, f'{consistent_hash(hash_seed)}.{file_format}')
-    print("Using cache on file: " + cache_filename  +" from " + hash_seed + "\n" )
     if os.path.exists(cache_filename):
         # Check if the file is older than 1 day
         modified_time = datetime.fromtimestamp(os.path.getmtime(cache_filename))
         if datetime.now() - modified_time < timedelta(days=cache_time_indays):
             with open(cache_filename, 'r') as file:
+                console_log("Using cache on file: " + cache_filename  +" from " + hash_seed + "\n" )
                 buff = file.read()
                 return buff
-            
+    # If cache is not valid, generate content
+    console_log("Update/New content stored it in cache: " + cache_filename  +" from " + hash_seed + "\n" )
     content = content_function(*content_function_params);
     # Write to cache
     os.makedirs(folder, exist_ok=True)
@@ -186,6 +189,10 @@ def consistent_hash(input_string):
     sha256 = hashlib.sha256()
     sha256.update(input_string.encode('utf-8'))
     return sha256.hexdigest()
+### Improve Log ###
+def console_log(message):
+    timestamp = datetime.datetime.now().strftime("[%d/%b/%Y %H:%M:%S]")
+    print(f"{timestamp} {message}")
 
 if __name__ == '__main__':
     app.run(debug=True)
