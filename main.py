@@ -3,10 +3,11 @@ from flask_cors import CORS
 import requests
 from ics import Calendar, Event
 import os
-from datetime import datetime, timedelta
+from datetime import datetime as dt, timedelta
 from time import sleep
 import json
 import hashlib
+import codecs
 
 
 app = Flask(__name__)
@@ -22,7 +23,10 @@ CACHE_DIR_RAW = './temp/raw/'
 def fetch_ics_from_url(url):
     response = requests.get(url)
     response.raise_for_status()
-    ics_data = response.content.decode ("ansi")
+    buff = response.content
+    ics_data = buff.decode("cp1252") 
+    ics_data = ics_data.encode("utf-8")
+    ics_data = str(ics_data)
     return ics_data
 
 def fetch_ics_from_url_cached(url):
@@ -31,7 +35,7 @@ def fetch_ics_from_url_cached(url):
     return json
 
 ### Parsing Calendars ###
-def merge_calendars(ics_texts):
+def merge_calendars(ics_texts:str):
     combined_calendar = Calendar()
     i=0
     for ics_text in ics_texts:
@@ -42,6 +46,16 @@ def merge_calendars(ics_texts):
             combined_calendar.events.add(calendar.events)
         i+=1
     return combined_calendar
+
+    def merge_calendars(calendars:[Calendar]):
+    counter = 0
+    for calendar in calendars:
+        if counter == 0:
+            merged_calendar = calendar
+        else:
+            merged_calendar.events.update(calendar.events)
+        counter += 1
+    return merged_calendar
 
 def generate_ics_http_response(ics: Calendar):
     return Response(ics.serialize(), mimetype='text/calendar')
@@ -150,15 +164,7 @@ def parse_calendar_blacklist(request):
     merged_calendar = merge_calendars(filtered_calendars)
     return merged_calendar.serialize()
 
-def merge_calendars(calendars:[Calendar]):
-    counter = 0
-    for calendar in calendars:
-        if counter == 0:
-            merged_calendar = calendar
-        else:
-            merged_calendar.events.update(calendar.events)
-        counter += 1
-    return merged_calendar
+
 
 
 ### Performance Improvement ###
@@ -166,8 +172,8 @@ def caching(folder,content_function,content_function_params,hash_seed,file_forma
     cache_filename = os.path.join(folder, f'{consistent_hash(hash_seed)}.{file_format}')
     if os.path.exists(cache_filename):
         # Check if the file is older than 1 day
-        modified_time = datetime.fromtimestamp(os.path.getmtime(cache_filename))
-        if datetime.now() - modified_time < timedelta(days=cache_time_indays):
+        modified_time = dt.fromtimestamp(os.path.getmtime(cache_filename))
+        if dt.now() - modified_time < timedelta(days=cache_time_indays):
             with open(cache_filename, 'r') as file:
                 console_log("Using cache on file: " + cache_filename  +" from " + hash_seed + "\n" )
                 buff = file.read()
@@ -189,9 +195,10 @@ def consistent_hash(input_string):
     sha256 = hashlib.sha256()
     sha256.update(input_string.encode('utf-8'))
     return sha256.hexdigest()
+
 ### Improve Log ###
 def console_log(message):
-    timestamp = datetime.datetime.now().strftime("[%d/%b/%Y %H:%M:%S]")
+    timestamp = dt.now().strftime("[%d/%b/%Y %H:%M:%S]")
     print(f"{timestamp} {message}")
 
 if __name__ == '__main__':
